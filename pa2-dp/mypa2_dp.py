@@ -28,8 +28,11 @@ class ValueAgent:
         """Initialize the policy function with equally distributed random probability.
 
         When n actions are available at state s, the probability of choosing an action should be 1/n.
-        """        
-        pass
+        """
+        num_actions = len(self.mdp.actions())
+        actions_with_prob = dict.fromkeys(self.mdp.actions(), 1/num_actions)
+        self.pi = dict.fromkeys(self.mdp.states(), dict(actions_with_prob))
+
                     
     def computeq_fromv(self, v: dict[str,float]) -> dict[str,dict[str,float]]:
         """Given a state-value table, compute the action-state values.
@@ -41,7 +44,19 @@ class ValueAgent:
         Returns:
             dict[str,dict[str,float]]: a q value table {state:{action:q-value}}
         """
-        pass
+
+        for state in self.mdp.states():
+            total = 0
+            for action in self.mdp.actions():
+                prob_list = self.mdp.T(state, action)
+                for prob in prob_list:
+                    total += (prob[1]*(self.mdp.R(state, action, prob[0]) + (self.mdp.gamma * self.v.get(prob[0]))))
+                if state not in self.q:
+                    self.q[state] = {}
+                self.q[state][action] = total
+
+        return self.q
+
 
     def greedy_policy_improvement(self, v: dict[str,float]) -> dict[str,dict[str,float]]:
         """Greedy policy improvement algorithm. Given a state-value table, update the policy pi.
@@ -52,7 +67,12 @@ class ValueAgent:
         Returns:
             pi (dict[str,dict[str,float]]): a policy table {state:{action:probability}}
         """
-        pass
+        is_policy_stable = True
+        new_action_table = self.computeq_fromv()
+        for state in self.mdp.states():
+            new_action =
+
+
 
     def check_term(self, v: dict[str,float], next_v: dict[str,float]) -> bool:
         """Return True if the state value has NOT converged.
@@ -66,7 +86,13 @@ class ValueAgent:
         Returns:
             bool: True if continue; False if converged
         """
-        pass     
+        delta = 0.0
+        for state in self.mdp.states():
+            delta = max(abs(next_v[state] - v[state]), delta)
+        if delta < self.thresh:
+            return False
+
+        return True
 
 
 class PIAgent(ValueAgent):
