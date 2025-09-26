@@ -25,9 +25,9 @@ class ValueAgent:
         self.thresh = conv_thresh
         self.v_update_history = list()
 
+        # Initializing all state-values V to 0.0
         for state in self.mdp.states():
             self.v[state] = 0.0
-
         self.v_update_history.append(self.v.copy())
 
     def init_random_policy(self):
@@ -36,6 +36,7 @@ class ValueAgent:
         When n actions are available at state s, the probability of choosing an action should be 1/n.
         """
 
+        # Creating a random policy 'pi' where all actions have equal probability
         for state in self.mdp.states():
             actions = self.mdp.actions(state)
             if not actions:
@@ -55,13 +56,17 @@ class ValueAgent:
         Returns:
             dict[str,dict[str,float]]: a q value table {state:{action:q-value}}
         """
-        self.q = {}
+
+        # Compute q-values from v-values
         for state in v.keys():
-            self.q[state] = {}
+            if state not in self.q:
+                self.q[state] = {}
             for action in self.mdp.actions(state):
                 self.q[state][action] = 0.0
                 for next_state, trans_prob in self.mdp.T(state, action):
-                    self.q[state][action] += (trans_prob*(self.mdp.R(state, action, next_state) + (self.mdp.gamma * v.get(next_state))))
+                    self.q[state][action] += (trans_prob *
+                                              (self.mdp.R(state, action, next_state) +
+                                               (self.mdp.gamma * v.get(next_state))))
 
         return self.q
 
@@ -76,11 +81,14 @@ class ValueAgent:
             pi (dict[str,dict[str,float]]): a policy table {state:{action:probability}}
         """
 
+        # Compute all q-values for v-values
         self.q = self.computeq_fromv(v)
         for state in v.keys():
             max_q = float('-inf')
             max_q_action = None
             for action in self.mdp.actions(state):
+
+                # Compute the best action i.e., action with maximum q-value
                 if self.q[state][action] > max_q:
                     max_q_action = action
                     max_q = self.q[state][action]
@@ -88,6 +96,7 @@ class ValueAgent:
             for action in self.mdp.actions(state):
                 self.pi[state][action] = 0.0
 
+            # Update policy greedily i.e., max-action probability = 1
             self.pi[state][max_q_action] = 1.0
 
         return self.pi
@@ -104,14 +113,16 @@ class ValueAgent:
         Returns:
             bool: True if continue; False if converged
         """
+
+        # Check for CONVERGENCE: i.e., if the difference between new and old v-values is within threshold(given)
         delta = 0.0
         for state in v.keys():
             delta = max(abs(next_v[state] - v[state]), delta)
 
         if delta < self.thresh:
-            return False
+            return False #Converged
 
-        return True
+        return True # not Converged, signal for continuance.
 
 
 class PIAgent(ValueAgent):
@@ -140,6 +151,8 @@ class PIAgent(ValueAgent):
         Returns:
             dict[str,float]: state-value table {state:v-value}
         """
+
+        # Evaluate the v-values for current policy-pi
         while True:
             new_v = {}
             for state in self.mdp.states():
@@ -149,8 +162,8 @@ class PIAgent(ValueAgent):
                         new_v[state] += pi[state][action] * (trans_prob * (
                                     self.mdp.R(state, action, next_state) + (self.mdp.gamma * self.v.get(next_state))))
 
-            self.v_update_history.append(new_v.copy())
-            converged = not self.check_term(self.v, new_v)
+            self.v_update_history.append(new_v.copy()) # Update all v-values history
+            converged = not self.check_term(self.v, new_v) # Check for convergence
             self.v = new_v
             if converged:
                 break
@@ -177,11 +190,11 @@ class PIAgent(ValueAgent):
 
         while True:
             self.__iter_policy_eval(self.pi)
-            old_policy = copy.deepcopy(self.pi)
+            old_policy = copy.deepcopy(self.pi) # Save the old policy to later compare with new policy for 'policy stability'
             self.greedy_policy_improvement(self.v)
 
             if old_policy == self.pi:
-                break
+                break # The policy is stable
 
         return self.pi
 
@@ -216,7 +229,10 @@ class VIAgent(ValueAgent):
             pi (dict[str,dict[str,float]]): a policy table {state:{action:probability}}
         """
 
+        # Combining both steps of policy iteration in value iteration
         while True:
+
+            # Compute v-values with max-action(according to greedy policy) until old and new v-values converge
             self.computeq_fromv(self.v)
             new_v = {}
             for state in self.mdp.states():
@@ -224,12 +240,13 @@ class VIAgent(ValueAgent):
                 max_q = float('-inf')
                 max_q_action = None
 
+                # Compute maximum q-value
                 for action in self.mdp.actions(state):
                     if self.q[state][action] > max_q:
                         max_q_action = action
                         max_q = self.q[state][action]
 
-                new_v[state] = self.q[state][max_q_action]
+                new_v[state] = max_q # Here v-value is maximum q-value
 
             self.v_update_history.append(new_v.copy())
 
@@ -238,7 +255,6 @@ class VIAgent(ValueAgent):
             if converged:
                 break
 
-
-
+        # Update to deterministic policy
         self.greedy_policy_improvement(self.v)
         return self.pi
