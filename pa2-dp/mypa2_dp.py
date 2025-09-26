@@ -73,7 +73,6 @@ class ValueAgent:
         Returns:
             pi (dict[str,dict[str,float]]): a policy table {state:{action:probability}}
         """
-        #is_policy_stable = True
 
         self.q = self.computeq_fromv(v)
         max_q = float('-inf')
@@ -177,13 +176,16 @@ class PIAgent(ValueAgent):
         Returns:
             pi (dict[str,dict[str,float]]): a policy table {state:{action:probability}}
         """
-        is_policy_stable = True
+
         while True:
+            is_policy_stable = False
+
             self.__iter_policy_eval(self.pi)
             old_policy = self.pi
             self.greedy_policy_improvement(self.v)
 
-            is_policy_stable = old_policy == self.pi
+            if old_policy == self.pi:
+                is_policy_stable = True
 
             if is_policy_stable:
                 break
@@ -220,4 +222,32 @@ class VIAgent(ValueAgent):
         Returns:
             pi (dict[str,dict[str,float]]): a policy table {state:{action:probability}}
         """
-        pass
+
+        while True:
+            self.computeq_fromv(self.v)
+            new_v = {}
+            for state in self.mdp.states():
+                new_v[state] = 0.0
+                total = 0
+                max_q = float('-inf')
+                max_q_action = None
+                for action in self.mdp.actions(state):
+                    if self.q[state][action] > max_q:
+                        max_q_action = action
+                        max_q = self.q[state][action]
+
+
+                for next_state, trans_prob in self.mdp.T(state, max_q_action):
+                    total += self.pi[state][max_q_action] * (trans_prob * (
+                                self.mdp.R(state, max_q_action, next_state) + (self.mdp.gamma * self.v.get(next_state))))
+
+                new_v[state] = total
+            self.v_update_history.append(new_v.copy())
+
+            if not self.check_term(self.v, new_v):
+                break
+
+            self.v = new_v
+
+        self.greedy_policy_improvement(self.v)
+        return self.pi
