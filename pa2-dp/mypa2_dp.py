@@ -229,7 +229,7 @@ class VIAgent(ValueAgent):
             pi (dict[str,dict[str,float]]): a policy table {state:{action:probability}}
         """
 
-        # Combining both steps of policy iteration in value iteration
+        # Combining both steps of policy iteration in each sweep of value iteration
         while True:
 
             # Compute v-values with max-action(according to greedy policy) until old and new v-values converge
