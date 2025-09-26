@@ -37,8 +37,12 @@ class ValueAgent:
         """
 
         for state in self.mdp.states():
-            num_actions = len(self.mdp.actions(state))
-            self.pi[state] = dict.fromkeys(self.mdp.actions(state), 1/num_actions)
+            actions = self.mdp.actions(state)
+            if not actions:
+                self.pi[state] = {}
+            else :
+                num_actions = len(actions)
+                self.pi[state] = dict.fromkeys(actions, 1/num_actions)
 
                     
     def computeq_fromv(self, v: dict[str,float]) -> dict[str,dict[str,float]]:
@@ -51,15 +55,13 @@ class ValueAgent:
         Returns:
             dict[str,dict[str,float]]: a q value table {state:{action:q-value}}
         """
-
+        self.q = {}
         for state in v.keys():
-            total = 0
-            if state not in self.q:
-                self.q[state] = {}
+            self.q[state] = {}
             for action in self.mdp.actions(state):
+                self.q[state][action] = 0.0
                 for next_state, trans_prob in self.mdp.T(state, action):
-                    total += (trans_prob*(self.mdp.R(state, action, next_state) + (self.mdp.gamma * v.get(next_state))))
-                self.q[state][action] = total
+                    self.q[state][action] += (trans_prob*(self.mdp.R(state, action, next_state) + (self.mdp.gamma * v.get(next_state))))
 
         return self.q
 
@@ -75,10 +77,9 @@ class ValueAgent:
         """
 
         self.q = self.computeq_fromv(v)
-        max_q = float('-inf')
-
-        max_q_action = None
         for state in v.keys():
+            max_q = float('-inf')
+            max_q_action = None
             for action in self.mdp.actions(state):
                 if self.q[state][action] > max_q:
                     max_q_action = action
@@ -143,19 +144,16 @@ class PIAgent(ValueAgent):
             new_v = {}
             for state in self.mdp.states():
                 new_v[state] = 0.0
-                total = 0
                 for action in self.mdp.actions(state):
                     for next_state, trans_prob in self.mdp.T(state, action):
-                        total += pi[state][action] * (trans_prob * (
+                        new_v[state] += pi[state][action] * (trans_prob * (
                                     self.mdp.R(state, action, next_state) + (self.mdp.gamma * self.v.get(next_state))))
 
-                new_v[state] = total
             self.v_update_history.append(new_v.copy())
-
-            if not self.check_term(self.v, new_v):
-                break
-
+            converged = not self.check_term(self.v, new_v)
             self.v = new_v
+            if converged:
+                break
 
         return self.v
 
@@ -178,16 +176,11 @@ class PIAgent(ValueAgent):
         """
 
         while True:
-            is_policy_stable = False
-
             self.__iter_policy_eval(self.pi)
-            old_policy = self.pi
+            old_policy = copy.deepcopy(self.pi)
             self.greedy_policy_improvement(self.v)
 
             if old_policy == self.pi:
-                is_policy_stable = True
-
-            if is_policy_stable:
                 break
 
         return self.pi
@@ -228,26 +221,24 @@ class VIAgent(ValueAgent):
             new_v = {}
             for state in self.mdp.states():
                 new_v[state] = 0.0
-                total = 0
                 max_q = float('-inf')
                 max_q_action = None
+
                 for action in self.mdp.actions(state):
                     if self.q[state][action] > max_q:
                         max_q_action = action
                         max_q = self.q[state][action]
 
+                new_v[state] = self.q[state][max_q_action]
 
-                for next_state, trans_prob in self.mdp.T(state, max_q_action):
-                    total += self.pi[state][max_q_action] * (trans_prob * (
-                                self.mdp.R(state, max_q_action, next_state) + (self.mdp.gamma * self.v.get(next_state))))
-
-                new_v[state] = total
             self.v_update_history.append(new_v.copy())
 
-            if not self.check_term(self.v, new_v):
+            converged = not self.check_term(self.v, new_v)
+            self.v = new_v
+            if converged:
                 break
 
-            self.v = new_v
+
 
         self.greedy_policy_improvement(self.v)
         return self.pi
