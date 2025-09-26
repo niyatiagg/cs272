@@ -1,5 +1,6 @@
 from mymdp import MDP
 import math
+import copy
 
 class ValueAgent:
     """Value-based Agent template (Used as a parent class for VIAgent and PIAgent)
@@ -24,14 +25,20 @@ class ValueAgent:
         self.thresh = conv_thresh
         self.v_update_history = list()
 
+        for state in self.mdp.states():
+            self.v[state] = 0.0
+
+        self.v_update_history.append(self.v.copy())
+
     def init_random_policy(self):
         """Initialize the policy function with equally distributed random probability.
 
         When n actions are available at state s, the probability of choosing an action should be 1/n.
         """
-        num_actions = len(self.mdp.actions())
-        actions_with_prob = dict.fromkeys(self.mdp.actions(), 1/num_actions)
-        self.pi = dict.fromkeys(self.mdp.states(), dict(actions_with_prob))
+
+        for state in self.mdp.states():
+            num_actions = len(self.mdp.actions(state))
+            self.pi[state] = dict.fromkeys(self.mdp.actions(state), 1/num_actions)
 
                     
     def computeq_fromv(self, v: dict[str,float]) -> dict[str,dict[str,float]]:
@@ -45,14 +52,13 @@ class ValueAgent:
             dict[str,dict[str,float]]: a q value table {state:{action:q-value}}
         """
 
-        for state in self.mdp.states():
+        for state in v.keys():
             total = 0
-            for action in self.mdp.actions():
-                prob_list = self.mdp.T(state, action)
-                for prob in prob_list:
-                    total += (prob[1]*(self.mdp.R(state, action, prob[0]) + (self.mdp.gamma * self.v.get(prob[0]))))
-                if state not in self.q:
-                    self.q[state] = {}
+            if state not in self.q:
+                self.q[state] = {}
+            for action in self.mdp.actions(state):
+                for next_state, trans_prob in self.mdp.T(state, action):
+                    total += (trans_prob*(self.mdp.R(state, action, next_state) + (self.mdp.gamma * v.get(next_state))))
                 self.q[state][action] = total
 
         return self.q
@@ -67,12 +73,24 @@ class ValueAgent:
         Returns:
             pi (dict[str,dict[str,float]]): a policy table {state:{action:probability}}
         """
-        is_policy_stable = True
-        new_action_table = self.computeq_fromv()
-        for state in self.mdp.states():
-            new_action =
+        #is_policy_stable = True
 
+        self.q = self.computeq_fromv(v)
+        max_q = float('-inf')
 
+        max_q_action = None
+        for state in v.keys():
+            for action in self.mdp.actions(state):
+                if self.q[state][action] > max_q:
+                    max_q_action = action
+                    max_q = self.q[state][action]
+
+            for action in self.mdp.actions(state):
+                self.pi[state][action] = 0.0
+
+            self.pi[state][max_q_action] = 1.0
+
+        return self.pi
 
     def check_term(self, v: dict[str,float], next_v: dict[str,float]) -> bool:
         """Return True if the state value has NOT converged.
@@ -87,8 +105,9 @@ class ValueAgent:
             bool: True if continue; False if converged
         """
         delta = 0.0
-        for state in self.mdp.states():
+        for state in v.keys():
             delta = max(abs(next_v[state] - v[state]), delta)
+
         if delta < self.thresh:
             return False
 
@@ -121,7 +140,25 @@ class PIAgent(ValueAgent):
         Returns:
             dict[str,float]: state-value table {state:v-value}
         """
-        pass
+        while True:
+            new_v = {}
+            for state in self.mdp.states():
+                new_v[state] = 0.0
+                total = 0
+                for action in self.mdp.actions(state):
+                    for next_state, trans_prob in self.mdp.T(state, action):
+                        total += pi[state][action] * (trans_prob * (
+                                    self.mdp.R(state, action, next_state) + (self.mdp.gamma * self.v.get(next_state))))
+
+                new_v[state] = total
+            self.v_update_history.append(new_v.copy())
+
+            if not self.check_term(self.v, new_v):
+                break
+
+            self.v = new_v
+
+        return self.v
 
 
     def policy_iteration(self) -> dict[str,dict[str,float]]:
@@ -140,8 +177,18 @@ class PIAgent(ValueAgent):
         Returns:
             pi (dict[str,dict[str,float]]): a policy table {state:{action:probability}}
         """
-        pass
+        is_policy_stable = True
+        while True:
+            self.__iter_policy_eval(self.pi)
+            old_policy = self.pi
+            self.greedy_policy_improvement(self.v)
 
+            is_policy_stable = old_policy == self.pi
+
+            if is_policy_stable:
+                break
+
+        return self.pi
 
 class VIAgent(ValueAgent):
     """Value Iteration Agent class
