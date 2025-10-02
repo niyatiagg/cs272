@@ -238,12 +238,10 @@ class VIAgent(ValueAgent):
             for state in self.mdp.states():
                 new_v[state] = 0.0
                 max_q = float('-inf')
-                max_q_action = None
 
                 # Compute maximum q-value
                 for action in self.mdp.actions(state):
                     if self.q[state][action] > max_q:
-                        max_q_action = action
                         max_q = self.q[state][action]
 
                 new_v[state] = max_q # Here v-value is maximum q-value
