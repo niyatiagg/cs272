@@ -5,7 +5,7 @@ observation, info = env.reset()
 
 total = 0
 for _ in range(1000):
-    action = env.action_space.sample()  
+    action = env.action_space.sample() # logic of the agent
     observation, reward, terminated, truncated, info = env.step(action)
     total += reward
 
